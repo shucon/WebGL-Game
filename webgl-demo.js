@@ -1,6 +1,6 @@
 var cubeRotation = 0.0;
 var trackLength = 100;
-var run = -10;
+var run = 0;
 main();
 //
 // Start here
@@ -101,38 +101,27 @@ function initBuffers(gl) {
 
   // Now create an array of positions for the cube.
 
-  const positions = [
-
-    // Top face
-    -1.0,  1.0, -1.0,
-    -1.0,  1.0,  1.0,
-     1.0,  1.0,  1.0,
-     1.0,  1.0, -1.0,
-
-    // Bottom face
-    -1.0, -1.0, -1.0,
-     1.0, -1.0, -1.0,
-     1.0, -1.0,  1.0,
-    -1.0, -1.0,  1.0,
-
-    // Right face
-     1.0, -1.0, -1.0,
-     1.0,  1.0, -1.0,
-     1.0,  1.0,  1.0,
-     1.0, -1.0,  1.0,
-
-    // Left face
-    -1.0, -1.0, -1.0,
-    -1.0, -1.0,  1.0,
-    -1.0,  1.0,  1.0,
-    -1.0,  1.0, -1.0,
-  ];
+  var positions = [];
+  var pos=0,i,k,n=8;
+  var pi = 3.14159, angle = 0, theta=(2*pi)/n;
+  for(i=0;i<n;i++){
+      for(k=0;k<2;k++){
+          positions[pos++]= 2*Math.cos(angle);
+          positions[pos++]= 2*Math.sin(angle);
+          positions[pos++]= 2.0;
+          positions[pos++]= 2*Math.cos(angle);
+          positions[pos++]= 2*Math.sin(angle);
+          positions[pos++]=-2.0;
+          angle += theta;
+      }
+      angle-=theta;
+  }
   var l=positions.length;
   for (var j = 0; j < trackLength; j++) {
     for (var i = 0; i < l; i+=3 ) {
       positions.push(positions[i]);
       positions.push(positions[i+1]);
-      positions.push(positions[i+2]-2*(j+1));
+      positions.push(positions[i+2]-4*(j+1));
     }
   }
   // Now pass the list of positions into WebGL to build the
@@ -146,6 +135,8 @@ function initBuffers(gl) {
 
   const faceColors = [
     [1.0,  1.0,  1.0,  1.0],    // Front face: white
+    [1.0,  0.2,  1.0,  1.0],    // Front face: white
+    [0.5,  0.7,  1.0,  1.0],    // Front face: white
     [1.0,  0.0,  0.0,  1.0],    // Back face: red
     [0.0,  1.0,  0.0,  1.0],    // Top face: green
     [0.0,  0.0,  1.0,  1.0],    // Bottom face: blue
@@ -168,7 +159,6 @@ function initBuffers(gl) {
       colors = colors.concat(c, c, c, c);
     }
   }
-  console.log(colors);
   const colorBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
@@ -184,18 +174,19 @@ function initBuffers(gl) {
   // position.
 
   const indices = [
-    8,  9,  10,     8,  10, 11,   // top
-    12, 13, 14,     12, 14, 15,   // bottom
-    16, 17, 18,     16, 18, 19,   // right
-    20, 21, 22,     20, 22, 23,   // left
+    0,  1,  2,      1,  2,  3,    // front
+    4,  5,  6,      5,  6,  7,    // back
+    8,  9,  10,     9,  10, 11,   // top
+    12, 13, 14,     13, 14, 15,   // bottom
+    16, 17, 18,     17, 18, 19,   // right
+    20, 21, 22,     21, 22, 23,   // left
+    24, 25, 26,     25, 26, 27,   // left
+    28, 29, 30,     29, 30, 31,   // left
   ];
-  for (i = 0 ; i < indices.length ; i++) {
-    indices[i] -= 8;
-  }
   var l = indices.length;
   for (j = 0; j < trackLength; j++) {
     for (i = 0 ; i < l ; i++) {
-      indices.push(indices[i]+(16*(j+1)));
+      indices.push(indices[i]+(32*(j+1)));
     }
   }   
   // Now send the element array to GL
@@ -253,14 +244,14 @@ function drawScene(gl, programInfo, buffers, deltaTime) {
 
   mat4.translate(modelViewMatrix,     // destination matrix
                  modelViewMatrix,     // matrix to translate
-                 [-0.0, 0.0, run]);  // amount to translate
+                 [-0.0, 1, run]);  // amount to translate
   mat4.rotate(modelViewMatrix,  // destination matrix
               modelViewMatrix,  // matrix to rotate
-              cubeRotation,     // amount to rotate in radians
+              cubeRotation * 0,     // amount to rotate in radians
               [0, 0, 1]);       // axis to rotate around (Z)
   mat4.rotate(modelViewMatrix,  // destination matrix
               modelViewMatrix,  // matrix to rotate
-              cubeRotation * .7,// amount to rotate in radians
+              cubeRotation * 0,// amount to rotate in radians
               [0, 1, 0]);       // axis to rotate around (X)
 
   // Tell WebGL how to pull out the positions from the position
@@ -330,7 +321,7 @@ function drawScene(gl, programInfo, buffers, deltaTime) {
 
   // Update the rotation for the next draw
 
-  // cubeRotation += deltaTime;
+  cubeRotation += deltaTime/15;
   run += deltaTime*2;
 }
 
