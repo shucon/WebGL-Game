@@ -1,6 +1,24 @@
 var cubeRotation = 0.0;
-var trackLength = 100;
+var trackLength = 1000;
 var run = 0;
+var jump = 0;
+Mousetrap.bind('a', function() {
+  cubeRotation += 0.05;
+});
+Mousetrap.bind('d', function() {
+  cubeRotation -= 0.05;
+});
+Mousetrap.bind('space', function() {
+  jump += 0.1;
+});
+Mousetrap.bind('space+a', function() {
+  jump += 0.1;
+  cubeRotation += 0.05;
+});
+Mousetrap.bind('space+d', function() {
+  jump += 0.1;
+  cubeRotation -= 0.05;
+});
 main();
 //
 // Start here
@@ -135,13 +153,12 @@ function initBuffers(gl) {
 
   const faceColors = [
     [1.0,  1.0,  1.0,  1.0],    // Front face: white
+    [0.0,  0.0,  0.0,  1.0],    // Front face: black
     [1.0,  0.2,  1.0,  1.0],    // Front face: white
     [0.5,  0.7,  1.0,  1.0],    // Front face: white
-    [1.0,  0.0,  0.0,  1.0],    // Back face: red
     [0.0,  1.0,  0.0,  1.0],    // Top face: green
+    [0.3,  0.9,  1.0,  1.0],    // Bottom face: blue
     [0.0,  0.0,  1.0,  1.0],    // Bottom face: blue
-    [1.0,  1.0,  0.0,  1.0],    // Right face: yellow
-    [1.0,  0.0,  1.0,  1.0],    // Left face: purple
     [0.4,  0.0,  1.0,  1.0],    // Left face: purple
     [1.0,  0.3,  1.0,  1.0],    // Left face: purple
     [1.0,  0.0,  0.4,  1.0],    // Left face: purple
@@ -150,14 +167,54 @@ function initBuffers(gl) {
   // Convert the array of colors into a table for all the vertices.
 
   var colors = [];
-
+  var black = 0;
   for (var i = 0; i < trackLength; i++) {
-    for (var j = 0; j < faceColors.length; ++j) {
-    const c = faceColors[j];
-
-    // Repeat each color four times for the four vertices of the face
-      colors = colors.concat(c, c, c, c);
+    if (i% 10 == 0) {
+      if (black == 1) {
+        black = 2;
+      }
+      else if (black == 2) {
+        black = 0;
+      }
+      else {
+        black = 1;
+      }
     }
+    if (black == 1) {
+      for (var j = 0; j < 4 ; j++) {
+        var c = faceColors[0];
+        colors = colors.concat(c, c, c, c);
+        var c = faceColors[1];
+        colors = colors.concat(c, c, c, c);
+      }
+      for (var j = 0; j < 4 ; j++) {
+        var c = faceColors[1];
+        colors = colors.concat(c, c, c, c);
+        var c = faceColors[0];
+        colors = colors.concat(c, c, c, c);
+      }
+      i++;
+    }
+    else if (black == 0) {
+      for (var j = 0; j < 4 ; j++) {
+        var c = faceColors[0];
+        colors = colors.concat(c, c, c, c);
+        var c = faceColors[1];
+        colors = colors.concat(c, c, c, c);
+      }
+    }
+    else {
+      for (var j = 2; j < faceColors.length; ++j) {
+        var temp = Math.floor(Math.random()*10);
+        if (temp < 2) {
+          temp += 2;
+        }
+        const c = faceColors[temp];
+        // Repeat each color four times for the four vertices of the face
+        colors = colors.concat(c,c,c,c);
+      }
+    }
+    
   }
   const colorBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
@@ -241,18 +298,20 @@ function drawScene(gl, programInfo, buffers, deltaTime) {
 
   // Now move the drawing position a bit to where we want to
   // start drawing the square.
-
+  
   mat4.translate(modelViewMatrix,     // destination matrix
-                 modelViewMatrix,     // matrix to translate
-                 [-0.0, 1, run]);  // amount to translate
+        modelViewMatrix,     // matrix to translate
+        [0, 1-jump, run]);  // amount to translate
+        // axis to rotate around (Z)
   mat4.rotate(modelViewMatrix,  // destination matrix
-              modelViewMatrix,  // matrix to rotate
-              cubeRotation * 0,     // amount to rotate in radians
-              [0, 0, 1]);       // axis to rotate around (Z)
+        modelViewMatrix,  // matrix to rotate
+        cubeRotation * 3,     // amount to rotate in radians
+        [0, 0, 1]);
+        
   mat4.rotate(modelViewMatrix,  // destination matrix
-              modelViewMatrix,  // matrix to rotate
-              cubeRotation * 0,// amount to rotate in radians
-              [0, 1, 0]);       // axis to rotate around (X)
+        modelViewMatrix,  // matrix to rotate
+        cubeRotation * 0,// amount to rotate in radians
+        [0, 1, 0]);       // axis to rotate around (X)
 
   // Tell WebGL how to pull out the positions from the position
   // buffer into the vertexPosition attribute
@@ -321,8 +380,9 @@ function drawScene(gl, programInfo, buffers, deltaTime) {
 
   // Update the rotation for the next draw
 
-  cubeRotation += deltaTime/15;
-  run += deltaTime*2;
+  // cubeRotation += deltaTime/15;
+  run += deltaTime*12;
+  // jump += deltaTime;
 }
 
 //
