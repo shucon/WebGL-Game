@@ -1,24 +1,58 @@
 var cubeRotation = 0.0;
 var trackLength = 1000;
 var run = 0;
-var jump = 0;
+var jump = 1.5;
+var gravity = 0.05;
+var buffers_obs = 0;
+var speed = 0;
+var tempR = Math.floor(Math.random()*10);
+document.getElementById("glcanvas").width = window.screen.width - 20;
+document.getElementById("glcanvas").height = window.screen.height - 150;
 Mousetrap.bind('a', function() {
-  cubeRotation += 0.05;
+  cubeRotation += 0.3925/3;
 });
 Mousetrap.bind('d', function() {
-  cubeRotation -= 0.05;
+  cubeRotation -= 0.3925/3;
 });
 Mousetrap.bind('space', function() {
-  jump += 0.1;
+  if (jump == 1.5) {
+    speed = 0.5;
+    jump -= speed;
+
+  }
 });
-Mousetrap.bind('space+a', function() {
-  jump += 0.1;
-  cubeRotation += 0.05;
-});
-Mousetrap.bind('space+d', function() {
-  jump += 0.1;
-  cubeRotation -= 0.05;
-});
+// Mousetrap.bind('space+a', function() {
+//   cubeRotation += 0.05;
+//   if (jump == 1) {
+//     speed = 0.5;
+//     jump -= speed;
+
+//   }
+// });
+// Mousetrap.bind('space+d', function() {
+//   cubeRotation -= 0.05;
+//   if (jump == 1) {
+//     speed = 0.5;
+//     jump -= speed;
+
+//   }
+// });
+// Mousetrap.bind('a + space', function() {
+//   cubeRotation += 0.05;
+//   if (jump == 1) {
+//     speed = 0.5;
+//     jump -= speed;
+
+//   }
+// });
+// Mousetrap.bind('d + space', function() {
+//   cubeRotation -= 0.05;
+//   if (jump == 1) {
+//     speed = 0.5;
+//     jump -= speed;
+
+//   }
+// });
 main();
 //
 // Start here
@@ -84,6 +118,7 @@ function main() {
   // Here's where we call the routine that builds all the
   // objects we'll be drawing.
   const buffers = initBuffers(gl);
+  buffers_obs = obsBuffers(gl);
 
   var then = 0;
 
@@ -93,7 +128,7 @@ function main() {
     const deltaTime = now - then;
     then = now;
 
-    drawScene(gl, programInfo, buffers, deltaTime);
+    drawScene(gl, programInfo, buffers, buffers_obs, deltaTime);
 
     requestAnimationFrame(render);
   }
@@ -258,10 +293,68 @@ function initBuffers(gl) {
   };
 }
 
+function obsBuffers(gl) {
+
+  const positionBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+  var positions = [
+    -0.76536686,2,0,
+    -0.76536686,2,-1,
+     0.76536686,2,0,
+     0.76536686,2,-1,
+    -0.76536686,-2,0,
+    -0.76536686,-2,-1,
+     0.76536686,-2,0,
+     0.76536686,-2,-1,
+  ];
+
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+  const faceColors = [
+    [1.0,  0.0,  0.0,  1.0],    // Front face: white
+  ];
+
+  // Convert the array of colors into a table for all the vertices.
+
+  var colors = [];
+  const c = faceColors[0];
+  for (i = 0; i < 8; i++)
+    colors = colors.concat(c,c,c,c);
+  const colorBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+
+  // Build the element array buffer; this specifies the indices
+  // into the vertex arrays for each face's vertices.
+
+  const indexBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+
+  // This array defines each face as two triangles, using the
+  // indices into the vertex array to specify each triangle's
+  // position.
+
+  const indices = [
+    0,  1,  2,      1,  2,  3,    // front
+    4,  5,  6,      5,  6,  7,    // back
+    1,0,5,5,4,0,
+    2,3,6,6,7,3,
+    0,2,4,4,6,2,
+    1,3,5,5,7,3,
+  ];
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
+      new Uint16Array(indices), gl.STATIC_DRAW);
+  return {
+    position: positionBuffer,
+    color: colorBuffer,
+    indices: indexBuffer,
+  };
+}
+
 //
 // Draw the scene.
 //
-function drawScene(gl, programInfo, buffers, deltaTime) {
+function drawScene(gl, programInfo, buffers, buffers_obs,deltaTime) {
   gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
   gl.clearDepth(1.0);                 // Clear everything
   gl.enable(gl.DEPTH_TEST);           // Enable depth testing
@@ -278,10 +371,10 @@ function drawScene(gl, programInfo, buffers, deltaTime) {
   // and we only want to see objects between 0.1 units
   // and 100 units away from the camera.
 
-  const fieldOfView = 45 * Math.PI / 180;   // in radians
+  const fieldOfView = 15 * Math.PI / 180;   // in radians
   const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-  const zNear = 0.1;
-  const zFar = 100.0;
+  const zNear = 0.7;
+  const zFar = 300.0;
   const projectionMatrix = mat4.create();
 
   // note: glmatrix.js always has the first argument
@@ -298,10 +391,12 @@ function drawScene(gl, programInfo, buffers, deltaTime) {
 
   // Now move the drawing position a bit to where we want to
   // start drawing the square.
-  
+  if (run > (trackLength)) {
+    run = 0;
+  }
   mat4.translate(modelViewMatrix,     // destination matrix
         modelViewMatrix,     // matrix to translate
-        [0, 1-jump, run]);  // amount to translate
+        [0,jump, run-15]);  // amount to translate
         // axis to rotate around (Z)
   mat4.rotate(modelViewMatrix,  // destination matrix
         modelViewMatrix,  // matrix to rotate
@@ -312,7 +407,8 @@ function drawScene(gl, programInfo, buffers, deltaTime) {
         modelViewMatrix,  // matrix to rotate
         cubeRotation * 0,// amount to rotate in radians
         [0, 1, 0]);       // axis to rotate around (X)
-
+  
+        
   // Tell WebGL how to pull out the positions from the position
   // buffer into the vertexPosition attribute
   {
@@ -373,6 +469,89 @@ function drawScene(gl, programInfo, buffers, deltaTime) {
 
   {
     const vertexCount = 24*(trackLength);
+    // const vertexCount = 36;
+    const type = gl.UNSIGNED_SHORT;
+    const offset = 0;
+    gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+  }
+// Cube Buffer
+const cubeMatrix = mat4.create();
+
+// Now move the drawing position a bit to where we want to
+// start drawing the square.
+    mat4.translate(cubeMatrix,     // destination matrix
+          cubeMatrix,     // matrix to translate
+          [0,jump, -100+run]);  // amount to translate
+    if ((-100 + run)> 0)
+        tempR = Math.floor(Math.random()*10);
+          // axis to rotate around (Z)
+    mat4.rotate(cubeMatrix,  // destination matrix
+          cubeMatrix,  // matrix to rotate
+          cubeRotation * 3 + (22.5*2*3.14/360)*((2*tempR)+1),     // amount to rotate in radians
+          [0, 0, 1]);
+
+    mat4.rotate(cubeMatrix,  // destination matrix
+          cubeMatrix,  // matrix to rotate
+          0,// amount to rotate in radians
+          [0, 1, 0]);       // axis to rotate around (X)
+    
+
+  {
+    const numComponents = 3;
+    const type = gl.FLOAT;
+    const normalize = false;
+    const stride = 0;
+    const offset = 0;
+    // gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix, false, MOVEMATRIX_TETRA);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers_obs.position);
+    gl.vertexAttribPointer(
+        programInfo.attribLocations.vertexPosition,
+        numComponents,
+        type,
+        normalize,
+        stride,
+        offset);
+    gl.enableVertexAttribArray(
+        programInfo.attribLocations.vertexPosition);
+  }
+
+  // Tell WebGL how to pull out the colors from the color buffer
+  // into the vertexColor attribute.
+  {
+    const numComponents = 4;
+    const type = gl.FLOAT;
+    const normalize = false;
+    const stride = 0;
+    const offset = 0;
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers_obs.color);
+    gl.vertexAttribPointer(
+        programInfo.attribLocations.vertexColor,
+        numComponents,
+        type,
+        normalize,
+        stride,
+        offset);
+    gl.enableVertexAttribArray(
+        programInfo.attribLocations.vertexColor);
+  }
+
+  // Tell WebGL which indices to use to index the vertices
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers_obs.indices);
+
+  // Tell WebGL to use our program when drawing
+
+  gl.useProgram(programInfo.program);
+
+  // Set the shader uniforms
+
+  gl.uniformMatrix4fv(
+      programInfo.uniformLocations.modelViewMatrix,
+      false,
+      cubeMatrix);
+
+  {
+    const vertexCount = 36;
+    // const vertexCount = 36;
     const type = gl.UNSIGNED_SHORT;
     const offset = 0;
     gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
@@ -381,8 +560,15 @@ function drawScene(gl, programInfo, buffers, deltaTime) {
   // Update the rotation for the next draw
 
   // cubeRotation += deltaTime/15;
-  run += deltaTime*12;
-  // jump += deltaTime;
+  run += deltaTime*24;
+  document.getElementById("score").innerHTML = "SCORE: " + Math.floor(run/10);
+  if (jump < 1.5) {
+    speed -= gravity;
+  } else {
+    speed = 0;
+    jump = 1.5;
+  }
+  jump -= speed;
 }
 
 //
