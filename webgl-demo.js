@@ -4,6 +4,11 @@ var run = 0;
 var jump = 1.5;
 var gravity = 0.05;
 var buffers_obs = 0;
+var score = 0;
+var count = 0;
+var life = 3;
+var distance = 100;
+var time = 0;
 var speed = 0;
 var tempR = Math.floor(Math.random()*10);
 document.getElementById("glcanvas").width = window.screen.width - 20;
@@ -123,15 +128,15 @@ function main() {
   var then = 0;
 
   // Draw the scene repeatedly
-  function render(now) {
-    now *= 0.001;  // convert to seconds
-    const deltaTime = now - then;
-    then = now;
-
-    drawScene(gl, programInfo, buffers, buffers_obs, deltaTime);
-
-    requestAnimationFrame(render);
-  }
+    function render(now) {
+      now *= 0.001;  // convert to seconds
+      const deltaTime = now - then;
+      then = now;
+      if (life > 0) {
+        drawScene(gl, programInfo, buffers, buffers_obs, deltaTime);
+      }
+      requestAnimationFrame(render);
+    }
   requestAnimationFrame(render);
 }
 
@@ -374,7 +379,7 @@ function drawScene(gl, programInfo, buffers, buffers_obs,deltaTime) {
   const fieldOfView = 15 * Math.PI / 180;   // in radians
   const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
   const zNear = 0.7;
-  const zFar = 300.0;
+  const zFar = 199.0;
   const projectionMatrix = mat4.create();
 
   // note: glmatrix.js always has the first argument
@@ -392,7 +397,8 @@ function drawScene(gl, programInfo, buffers, buffers_obs,deltaTime) {
   // Now move the drawing position a bit to where we want to
   // start drawing the square.
   if (run > (trackLength)) {
-    run = 0;
+    run = 10;
+    distance = 100;
   }
   mat4.translate(modelViewMatrix,     // destination matrix
         modelViewMatrix,     // matrix to translate
@@ -481,15 +487,30 @@ const cubeMatrix = mat4.create();
 // start drawing the square.
     mat4.translate(cubeMatrix,     // destination matrix
           cubeMatrix,     // matrix to translate
-          [0,jump, -100+run]);  // amount to translate
-    if ((-100 + run)> 0)
-        tempR = Math.floor(Math.random()*10);
+          [0,jump, run-distance]);  // amount to translate
+    if (count < 3){
+      var angle = 0;
+    } else {
+      var angle = score;
+    }
           // axis to rotate around (Z)
     mat4.rotate(cubeMatrix,  // destination matrix
           cubeMatrix,  // matrix to rotate
-          cubeRotation * 3 + (22.5*2*3.14/360)*((2*tempR)+1),     // amount to rotate in radians
+          cubeRotation * 3 + (22.5*2*3.14/360)*((2*tempR)+1) + angle/30,     // amount to rotate in radians
           [0, 0, 1]);
-
+var collide = (cubeRotation * 3 + (22.5*2*3.14/360)*((2*tempR)+1) + angle/30)%3.14;
+console.log(collide);
+if (( collide >= 2.7 ||
+          collide <= 0.4)
+          && run-distance > 0 && time > 10) {
+            time = 0;
+            life--;
+}
+if ((run - distance)> 0){
+  distance += 200;
+  count++;
+  tempR += 42.5;  
+}
     mat4.rotate(cubeMatrix,  // destination matrix
           cubeMatrix,  // matrix to rotate
           0,// amount to rotate in radians
@@ -560,8 +581,10 @@ const cubeMatrix = mat4.create();
   // Update the rotation for the next draw
 
   // cubeRotation += deltaTime/15;
-  run += deltaTime*24;
-  document.getElementById("score").innerHTML = "SCORE: " + Math.floor(run/10);
+  run += deltaTime*24*(score/400+1);
+  score++;
+  document.getElementById("score").innerHTML = "SCORE: " + Math.floor(score/20);
+  document.getElementById("life").innerHTML = "LIVES: " + life;
   if (jump < 1.5) {
     speed -= gravity;
   } else {
@@ -569,6 +592,7 @@ const cubeMatrix = mat4.create();
     jump = 1.5;
   }
   jump -= speed;
+  time++;
 }
 
 //
