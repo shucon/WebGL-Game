@@ -491,7 +491,10 @@ const cubeMatrix = mat4.create();
     if (count < 3){
       var angle = 0;
     } else {
-      var angle = score;
+      if (count%2 == 0)
+        var angle = score;
+      else
+        var angle = -score;      
     }
           // axis to rotate around (Z)
     mat4.rotate(cubeMatrix,  // destination matrix
