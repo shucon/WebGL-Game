@@ -13,55 +13,12 @@ var speed = 0;
 var tempR = Math.floor(Math.random()*10);
 document.getElementById("glcanvas").width = window.screen.width - 20;
 document.getElementById("glcanvas").height = window.screen.height - 150;
-Mousetrap.bind('a', function() {
-  cubeRotation += 0.3925/3;
-});
-Mousetrap.bind('d', function() {
-  cubeRotation -= 0.3925/3;
-});
-Mousetrap.bind('space', function() {
-  if (jump == 1.5) {
-    speed = 0.5;
-    jump -= speed;
-
-  }
-});
-// Mousetrap.bind('space+a', function() {
-//   cubeRotation += 0.05;
-//   if (jump == 1) {
-//     speed = 0.5;
-//     jump -= speed;
-
-//   }
-// });
-// Mousetrap.bind('space+d', function() {
-//   cubeRotation -= 0.05;
-//   if (jump == 1) {
-//     speed = 0.5;
-//     jump -= speed;
-
-//   }
-// });
-// Mousetrap.bind('a + space', function() {
-//   cubeRotation += 0.05;
-//   if (jump == 1) {
-//     speed = 0.5;
-//     jump -= speed;
-
-//   }
-// });
-// Mousetrap.bind('d + space', function() {
-//   cubeRotation -= 0.05;
-//   if (jump == 1) {
-//     speed = 0.5;
-//     jump -= speed;
-
-//   }
-// });
+var map = {}; // You could also use an array
+onkeydown = onkeyup = function(e){
+    e = e || event; // to deal with IE
+    map[e.keyCode] = e.type == 'keydown';
+}
 main();
-//
-// Start here
-//
 function main() {
   const canvas = document.querySelector('#glcanvas');
   const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
@@ -78,25 +35,27 @@ function main() {
   const vsSource = `
     attribute vec4 aVertexPosition;
     attribute vec4 aVertexColor;
+    attribute vec2 aTextureCoord;
 
     uniform mat4 uModelViewMatrix;
     uniform mat4 uProjectionMatrix;
 
     varying lowp vec4 vColor;
-
+    varying vec2 vTextureCoord;
     void main(void) {
       gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-      vColor = aVertexColor;
+      vTextureCoord = aTextureCoord;
     }
   `;
 
   // Fragment shader program
 
   const fsSource = `
-    varying lowp vec4 vColor;
-
+    precision mediump float;
+    varying vec2 vTextureCoord;
+    uniform sampler2D uSampler;
     void main(void) {
-      gl_FragColor = vColor;
+      gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
     }
   `;
 
@@ -112,7 +71,7 @@ function main() {
     program: shaderProgram,
     attribLocations: {
       vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
-      vertexColor: gl.getAttribLocation(shaderProgram, 'aVertexColor'),
+      vertexColor: gl.getAttribLocation(shaderProgram, 'aTextureCoord'),
     },
     uniformLocations: {
       projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
@@ -129,6 +88,16 @@ function main() {
 
   // Draw the scene repeatedly
     function render(now) {
+      if (map[65])
+        cubeRotation += 0.3925/13;      
+      if (map[68])
+        cubeRotation -= 0.3925/13;
+      if (map[32]){  
+        if (jump == 1.5) {
+        speed = 0.5;
+        jump -= speed;
+      }
+    }
       now *= 0.001;  // convert to seconds
       const deltaTime = now - then;
       then = now;
@@ -139,17 +108,37 @@ function main() {
     }
   requestAnimationFrame(render);
 }
+function initTexture(gl,neheTexture) {
+  neheTexture.image.onload = function() {
+    handleLoadedTexture(gl,neheTexture)
+  }
+}
+function handleLoadedTexture(gl,texture) {
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture.image);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.bindTexture(gl.TEXTURE_2D, null);
 
+}
 //
 // initBuffers
 //
 // Initialize the buffers we'll need. For this demo, we just
 // have one object -- a simple three-dimensional cube.
 //
+var neheTexture;
 function initBuffers(gl) {
 
   // Create a buffer for the cube's vertex positions.
-
+  var color = "texture.jpg";
+  neheTexture = gl.createTexture();
+  neheTexture.image = new Image();
+  neheTexture.image.src = color;
+  initTexture(gl,neheTexture);
   const positionBuffer = gl.createBuffer();
 
   // Select the positionBuffer as the one to apply buffer
@@ -191,74 +180,62 @@ function initBuffers(gl) {
   // Now set up the colors for the faces. We'll use solid colors
   // for each face.
 
-  const faceColors = [
-    [1.0,  1.0,  1.0,  1.0],    // Front face: white
-    [0.0,  0.0,  0.0,  1.0],    // Front face: black
-    [1.0,  0.2,  1.0,  1.0],    // Front face: white
-    [0.5,  0.7,  1.0,  1.0],    // Front face: white
-    [0.0,  1.0,  0.0,  1.0],    // Top face: green
-    [0.3,  0.9,  1.0,  1.0],    // Bottom face: blue
-    [0.0,  0.0,  1.0,  1.0],    // Bottom face: blue
-    [0.4,  0.0,  1.0,  1.0],    // Left face: purple
-    [1.0,  0.3,  1.0,  1.0],    // Left face: purple
-    [1.0,  0.0,  0.4,  1.0],    // Left face: purple
-  ];
+  cubeVertexTextureCoordBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexTextureCoordBuffer);
+    var textureCoords = [
+      // Front face
+      0.0, 0.0,
+      1.0, 0.0,
+      1.0, 1.0,
+      0.0, 1.0,
 
-  // Convert the array of colors into a table for all the vertices.
+      // Back face
+      0.0, 0.0,
+      1.0, 0.0,
+      1.0, 1.0,
+      0.0, 1.0,
 
-  var colors = [];
-  var black = 0;
-  for (var i = 0; i < trackLength; i++) {
-    if (i% 10 == 0) {
-      if (black == 1) {
-        black = 2;
-      }
-      else if (black == 2) {
-        black = 0;
-      }
-      else {
-        black = 1;
-      }
-    }
-    if (black == 1) {
-      for (var j = 0; j < 4 ; j++) {
-        var c = faceColors[0];
-        colors = colors.concat(c, c, c, c);
-        var c = faceColors[1];
-        colors = colors.concat(c, c, c, c);
-      }
-      for (var j = 0; j < 4 ; j++) {
-        var c = faceColors[1];
-        colors = colors.concat(c, c, c, c);
-        var c = faceColors[0];
-        colors = colors.concat(c, c, c, c);
-      }
-      i++;
-    }
-    else if (black == 0) {
-      for (var j = 0; j < 4 ; j++) {
-        var c = faceColors[0];
-        colors = colors.concat(c, c, c, c);
-        var c = faceColors[1];
-        colors = colors.concat(c, c, c, c);
-      }
-    }
-    else {
-      for (var j = 2; j < faceColors.length; ++j) {
-        var temp = Math.floor(Math.random()*10);
-        if (temp < 2) {
-          temp += 2;
-        }
-        const c = faceColors[temp];
-        // Repeat each color four times for the four vertices of the face
-        colors = colors.concat(c,c,c,c);
-      }
-    }
-    
-  }
-  const colorBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+      // Top face
+      0.0, 0.0,
+      1.0, 0.0,
+      1.0, 1.0,
+      0.0, 1.0,
+
+      // Bottom face
+      0.0, 0.0,
+      1.0, 0.0,
+      1.0, 1.0,
+      0.0, 1.0,
+
+      // Right face
+      0.0, 0.0,
+      1.0, 0.0,
+      1.0, 1.0,
+      0.0, 1.0,
+
+      // Left face
+      0.0, 0.0,
+      1.0, 0.0,
+      1.0, 1.0,
+      0.0, 1.0,
+      
+      0.0, 0.0,
+      1.0, 0.0,
+      1.0, 1.0,
+      0.0, 1.0,
+
+      // Top face
+      0.0, 0.0,
+      1.0, 0.0,
+      1.0, 1.0,
+      0.0, 1.0,
+    ];
+    var textureCoords1 = [];
+    for (var i = 0; i < trackLength ; i++)
+        textureCoords1 = textureCoords1.concat(textureCoords);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoords1), gl.STATIC_DRAW);
+    cubeVertexTextureCoordBuffer.itemSize = 2;
+    cubeVertexTextureCoordBuffer.numItems = 24;
 
   // Build the element array buffer; this specifies the indices
   // into the vertex arrays for each face's vertices.
@@ -293,13 +270,17 @@ function initBuffers(gl) {
 
   return {
     position: positionBuffer,
-    color: colorBuffer,
+    color: cubeVertexTextureCoordBuffer,
     indices: indexBuffer,
   };
 }
-
+var neheTexture1;
 function obsBuffers(gl) {
-
+  var color = "texture1.jpg";
+  neheTexture1 = gl.createTexture();
+  neheTexture1.image = new Image();
+  neheTexture1.image.src = color; 
+  initTexture(gl,neheTexture1);  
   const positionBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
   var positions = [
@@ -316,18 +297,53 @@ function obsBuffers(gl) {
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
 
   const faceColors = [
-    [1.0,  0.0,  0.0,  1.0],    // Front face: white
+    [1.0,  0.0,  0.0,  1.0],
   ];
 
   // Convert the array of colors into a table for all the vertices.
 
-  var colors = [];
-  const c = faceColors[0];
-  for (i = 0; i < 8; i++)
-    colors = colors.concat(c,c,c,c);
-  const colorBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+cubeVertexTextureCoordBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexTextureCoordBuffer);
+    var textureCoords = [
+      // Front face
+      0.0, 0.0,
+      1.0, 0.0,
+      1.0, 1.0,
+      0.0, 1.0,
+
+      // Back face
+      0.0, 0.0,
+      1.0, 0.0,
+      1.0, 1.0,
+      0.0, 1.0,
+
+      // Top face
+      0.0, 0.0,
+      1.0, 0.0,
+      1.0, 1.0,
+      0.0, 1.0,
+
+      // Bottom face
+      0.0, 0.0,
+      1.0, 0.0,
+      1.0, 1.0,
+      0.0, 1.0,
+
+      // Right face
+      0.0, 0.0,
+      1.0, 0.0,
+      1.0, 1.0,
+      0.0, 1.0,
+
+      // Left face
+      0.0, 0.0,
+      1.0, 0.0,
+      1.0, 1.0,
+      0.0, 1.0,
+    ];
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoords), gl.STATIC_DRAW);
+    cubeVertexTextureCoordBuffer.itemSize = 2;
+    cubeVertexTextureCoordBuffer.numItems = 24;
 
   // Build the element array buffer; this specifies the indices
   // into the vertex arrays for each face's vertices.
@@ -351,7 +367,7 @@ function obsBuffers(gl) {
       new Uint16Array(indices), gl.STATIC_DRAW);
   return {
     position: positionBuffer,
-    color: colorBuffer,
+    color: cubeVertexTextureCoordBuffer,
     indices: indexBuffer,
   };
 }
@@ -438,7 +454,7 @@ function drawScene(gl, programInfo, buffers, buffers_obs,deltaTime) {
   // Tell WebGL how to pull out the colors from the color buffer
   // into the vertexColor attribute.
   {
-    const numComponents = 4;
+    const numComponents = 2;
     const type = gl.FLOAT;
     const normalize = false;
     const stride = 0;
@@ -453,6 +469,9 @@ function drawScene(gl, programInfo, buffers, buffers_obs,deltaTime) {
         offset);
     gl.enableVertexAttribArray(
         programInfo.attribLocations.vertexColor);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, neheTexture);
+    // gl.uniform1i(programInfo.attribLocations.vertexColor, 0);
   }
 
   // Tell WebGL which indices to use to index the vertices
@@ -542,12 +561,12 @@ if ((run - distance)> 0){
   // Tell WebGL how to pull out the colors from the color buffer
   // into the vertexColor attribute.
   {
-    const numComponents = 4;
+    const numComponents = 2;
     const type = gl.FLOAT;
     const normalize = false;
     const stride = 0;
     const offset = 0;
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffers_obs.color);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.color);
     gl.vertexAttribPointer(
         programInfo.attribLocations.vertexColor,
         numComponents,
@@ -557,6 +576,8 @@ if ((run - distance)> 0){
         offset);
     gl.enableVertexAttribArray(
         programInfo.attribLocations.vertexColor);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, neheTexture1);
   }
 
   // Tell WebGL which indices to use to index the vertices
