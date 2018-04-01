@@ -262,7 +262,21 @@ function initBuffers(gl) {
     for (i = 0 ; i < l ; i++) {
       indices.push(indices[i]+(32*(j+1)));
     }
-  }   
+  }
+  cubeVertexNormalBuffer = gl.createBuffer();
+  var normal = [];
+  gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexNormalBuffer);
+  for(var i=0;i<trackLength ;i++){
+  	var ang = Math.PI/4;
+  	for(var j=0;j<8;j++){
+	  	var normals = [Math.cos(ang), Math.sin(ang), 0.0];
+	  	normal = normal.concat(normals, normals, normals, normals);
+	  	ang+=Math.PI/4;
+	  }
+  }
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normal), gl.STATIC_DRAW);
+  cubeVertexNormalBuffer.itemSize = 3;
+  cubeVertexNormalBuffer.numItems = 24;   
   // Now send the element array to GL
 
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
@@ -439,6 +453,24 @@ function drawScene(gl, programInfo, buffers, buffers_obs,deltaTime) {
     const normalize = false;
     const stride = 0;
     const offset = 0;
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.light);
+    gl.vertexAttribPointer(
+        programInfo.attribLocations.lightPosition,
+        numComponents,
+        type,
+        normalize,
+        stride,
+        offset);
+    gl.enableVertexAttribArray(
+        programInfo.attribLocations.lightPosition);
+  }
+
+  {
+    const numComponents = 3;
+    const type = gl.FLOAT;
+    const normalize = false;
+    const stride = 0;
+    const offset = 0;
     gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
     gl.vertexAttribPointer(
         programInfo.attribLocations.vertexPosition,
@@ -482,6 +514,21 @@ function drawScene(gl, programInfo, buffers, buffers_obs,deltaTime) {
   gl.useProgram(programInfo.program);
 
   // Set the shader uniforms
+  gl.uniform3f(
+    programInfo.uniformLocations.ambientColorUniform,
+    parseFloat(1),
+    parseFloat(0.1),
+    parseFloat(0.2)
+  );
+  var lightingDirection = [
+    parseFloat(0),
+    parseFloat(0),
+    parseFloat(1)
+  ];
+  var adjustedLD = vec3.create();
+  vec3.normalize(lightingDirection, adjustedLD);
+  vec3.scale(adjustedLD, -1);
+  gl.uniform3fv(programInfo.uniformLocations.lightingDirectionUniform, adjustedLD);
 
   gl.uniformMatrix4fv(
       programInfo.uniformLocations.projectionMatrix,
