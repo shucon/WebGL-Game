@@ -8,7 +8,10 @@ var score = 0;
 var count = 0;
 var life = 3;
 var distance = 100;
+var grayScala = false;
+var flashScala = false;
 var time = 0;
+var time1 = 0;
 var speed = 0;
 var tempR = Math.floor(Math.random()*10);
 document.getElementById("glcanvas").width = window.screen.width - 20;
@@ -32,30 +35,58 @@ function main() {
 
   // Vertex shader program
 
-  const vsSource = `
+  var vsSource = `
     attribute vec4 aVertexPosition;
     attribute vec4 aVertexColor;
+    attribute vec3 aVertexNormal;
     attribute vec2 aTextureCoord;
 
+    uniform mat4 uNormalMatrix;
     uniform mat4 uModelViewMatrix;
     uniform mat4 uProjectionMatrix;
+    uniform bool flashScala;
 
+    varying highp vec3 vLighting;
     varying lowp vec4 vColor;
     varying vec2 vTextureCoord;
     void main(void) {
       gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
       vTextureCoord = aTextureCoord;
+      highp vec3 ambientLight = vec3(0.5,0.5, 0.5);
+      highp vec3 directionalLightColor = vec3(1, 1, 1);
+      if (flashScala == true)
+        directionalLightColor = vec3(2, 2, 1);
+      highp vec3 directionalVector = normalize(vec3(0.85, 0.8, 0.75));
+
+      highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
+
+      highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
+      vLighting = ambientLight + (directionalLightColor * directional);
     }
   `;
 
   // Fragment shader program
 
   const fsSource = `
-    precision mediump float;
-    varying vec2 vTextureCoord;
+  precision mediump float;
+    varying highp vec2 vTextureCoord;
+    varying highp vec3 vLighting;
     uniform sampler2D uSampler;
+    uniform bool grayScala;
+    
+    vec4 toGrayscale(in vec4 color) {
+      float average = (color.r + color.g + color.b) / 3.0;
+      return vec4(average, average, average, 1.0);
+      
+    }
+    
     void main(void) {
-      gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
+      highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
+      if (grayScala == true)
+        gl_FragColor = toGrayscale(vec4(texelColor.rgb * vLighting, texelColor.a));   
+
+      else
+        gl_FragColor = vec4(texelColor.rgb *vLighting, texelColor.a);
     }
   `;
 
@@ -70,12 +101,17 @@ function main() {
   const programInfo = {
     program: shaderProgram,
     attribLocations: {
+      vertexNormal: gl.getAttribLocation(shaderProgram, 'aVertexNormal'),
       vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
       vertexColor: gl.getAttribLocation(shaderProgram, 'aTextureCoord'),
     },
     uniformLocations: {
       projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
       modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+      grayScala: gl.getUniformLocation(shaderProgram, 'grayScala'),
+      normalMatrix: gl.getUniformLocation(shaderProgram, 'uNormalMatrix'),
+      uSampler: gl.getUniformLocation(shaderProgram, 'uSampler'),
+      flashScala: gl.getUniformLocation(shaderProgram, 'flashScala'),
     },
   };
 
@@ -88,6 +124,7 @@ function main() {
 
   // Draw the scene repeatedly
     function render(now) {
+      time1++;
       if (map[65])
         cubeRotation += 0.3925/13;      
       if (map[68])
@@ -96,6 +133,12 @@ function main() {
         if (jump == 1.5) {
         speed = 0.5;
         jump -= speed;
+      }
+    }
+    if (map[66]) {        
+      if (time1 > 10){
+        grayScala = !grayScala;
+        time1 = 0;        
       }
     }
       now *= 0.001;  // convert to seconds
@@ -263,11 +306,13 @@ function initBuffers(gl) {
       indices.push(indices[i]+(32*(j+1)));
     }
   }
-  cubeVertexNormalBuffer = gl.createBuffer();
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
+    new Uint16Array(indices), gl.STATIC_DRAW);
+      cubeVertexNormalBuffer = gl.createBuffer();
   var normal = [];
   gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexNormalBuffer);
   for(var i=0;i<trackLength ;i++){
-  	var ang = Math.PI/4;
+  	var ang = Math.PI/2;
   	for(var j=0;j<8;j++){
 	  	var normals = [Math.cos(ang), Math.sin(ang), 0.0];
 	  	normal = normal.concat(normals, normals, normals, normals);
@@ -279,15 +324,17 @@ function initBuffers(gl) {
   cubeVertexNormalBuffer.numItems = 24;   
   // Now send the element array to GL
 
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
-      new Uint16Array(indices), gl.STATIC_DRAW);
+
 
   return {
     position: positionBuffer,
     color: cubeVertexTextureCoordBuffer,
     indices: indexBuffer,
+    normal: cubeVertexNormalBuffer,
   };
 }
+
+
 var neheTexture1;
 function obsBuffers(gl) {
   var color = "texture1.jpg";
@@ -423,6 +470,8 @@ function drawScene(gl, programInfo, buffers, buffers_obs,deltaTime) {
   // Set the drawing position to the "identity" point, which is
   // the center of the scene.
   const modelViewMatrix = mat4.create();
+  const normalMatrix = mat4.create();
+
 
   // Now move the drawing position a bit to where we want to
   // start drawing the square.
@@ -444,7 +493,8 @@ function drawScene(gl, programInfo, buffers, buffers_obs,deltaTime) {
         cubeRotation * 0,// amount to rotate in radians
         [0, 1, 0]);       // axis to rotate around (X)
   
-        
+  mat4.invert(normalMatrix, modelViewMatrix);
+  mat4.transpose(normalMatrix, normalMatrix);
   // Tell WebGL how to pull out the positions from the position
   // buffer into the vertexPosition attribute
   {
@@ -453,16 +503,16 @@ function drawScene(gl, programInfo, buffers, buffers_obs,deltaTime) {
     const normalize = false;
     const stride = 0;
     const offset = 0;
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.light);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.normal);
     gl.vertexAttribPointer(
-        programInfo.attribLocations.lightPosition,
+        programInfo.attribLocations.vertexNormal,
         numComponents,
         type,
         normalize,
         stride,
         offset);
     gl.enableVertexAttribArray(
-        programInfo.attribLocations.lightPosition);
+        programInfo.attribLocations.vertexNormal);
   }
 
   {
@@ -504,6 +554,10 @@ function drawScene(gl, programInfo, buffers, buffers_obs,deltaTime) {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, neheTexture);
     // gl.uniform1i(programInfo.attribLocations.vertexColor, 0);
+    gl.uniform1i(programInfo.uniformLocations.flashScala, flashScala);
+    gl.uniform1i(programInfo.uniformLocations.grayScala, grayScala);
+    if (score%100 == 0)
+        flashScala = !flashScala;
   }
 
   // Tell WebGL which indices to use to index the vertices
@@ -539,6 +593,11 @@ function drawScene(gl, programInfo, buffers, buffers_obs,deltaTime) {
       false,
       modelViewMatrix);
 
+      gl.uniformMatrix4fv(
+        programInfo.uniformLocations.normalMatrix,
+        false,
+        normalMatrix);
+
   {
     const vertexCount = 24*(trackLength);
     // const vertexCount = 36;
@@ -568,8 +627,7 @@ const cubeMatrix = mat4.create();
           cubeRotation * 3 + (22.5*2*3.14/360)*((2*tempR)+1) + angle/30,     // amount to rotate in radians
           [0, 0, 1]);
 var collide = (cubeRotation * 3 + (22.5*2*3.14/360)*((2*tempR)+1) + angle/30)%3.14;
-console.log(collide);
-if (( collide >= 2.7 ||
+  if (( collide >= 2.7 ||
           collide <= 0.4)
           && run-distance > 0 && time > 10) {
             time = 0;
